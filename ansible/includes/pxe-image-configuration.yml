@@ -1,0 +1,74 @@
+- name: Copy images
+  copy:
+    src: "{{ item.local_path }}/{{ item.file }}.iso"
+    dest: "{{ temp_image_dir.path }}"
+    remote_src: yes
+
+- name: Copy Kickstarts
+  copy:
+    src: "{{ item.local_path }}/{{ item.kickstart }}"
+    dest: "/var/ftp/pub/ks/"
+
+- name: Create image network boot directories
+  file:
+    path: "/var/lib/tftpboot/networkboot/{{ item.file }}"
+    state: directory
+
+- name: Create image ftp directories
+  file:
+    path: "/var/ftp/pub/{{ item.file }}"
+    state: directory
+
+- name: Create image mount directories
+  file:
+    path: "/iso_image/{{ item.file }}"
+    state: directory
+
+- name: Mount images
+  ansible.posix.mount:
+    path: "/iso_image/{{ item.file }}"
+    src: "{{ temp_image_dir.path }}/{{ item.file }}.iso"
+    fstype: iso9660
+    ops: ro, noauto
+    state: present
+
+- name: Copy images to FTP
+  copy:
+    src: "/iso_image/{{ item.file }}/"
+    dest: "/var/ftp/pub/{{ item.file }}/"
+    directory_mode: yes
+
+- name: Copy image PXE kernel modules to TFTP
+  copy:
+    src: "/var/ftp/pub/{{ item.file }}/images/pxeboot/initrd.img"
+    dest: "/var/lib/tftpboot/networkboot/{{ item.file }}/"
+
+- name: Copy image PXE kernel to TFTP
+  copy:
+    src: "/var/ftp/pub/{{ item.file }}/images/pxeboot/vmlinuz"
+    dest: "/var/lib/tftpboot/networkboot/{{ item.file }}/"
+
+- name: Configure PXE Boot Menu
+  blockinfile:
+    path: /var/lib/tftpboot/pxelinux.cfg/default
+    block: |
+      default menu.c32
+      prompt 1
+      timeout 600
+      menu title PXE Image Menu
+
+- name: Add Images to PXE Boot Menu
+  blockinfile:
+    path: /var/lib/tftpboot/pxelinux.cfg/default
+    insertafter: 'menu title PXE Image Menu'
+    block: |
+      # Start - Menu item for {{ item.menu_name }}
+      label Install {{ item.menu_name }}
+      kernel /networkboot/{{ item.file }}/vmlinuz
+      append initrd=/networkboot/{{ item.file }}/initrd.img inst.repo=ftp://{{ item.server_address }}/pub/{{ item.file }} inst.ks=ftp://{{ item.server_address }}/pub/ks/{{ item.kickstart }}
+      # End - Menu item for {{ item.menu_name }}
+
+- name: Unmount images
+  ansible.posix.mount:
+    path: "/iso_image/{{ item.file }}"
+    state: unmounted

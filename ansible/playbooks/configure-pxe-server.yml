@@ -1,9 +1,21 @@
 - hosts: all
   vars:
-    images_path: '~/Images/'
     images:
-      - oel79.iso
-      - oel85.iso
+    - { local_path: '~/Images/', file: 'oel79', menu_name: 'Oracle Linux 7.9', server_address: '10.0.1.2', kickstart: 'oel79-stig.ks' }
+    - { local_path: '~/Images/', file: 'oel85', menu_name: 'Oracle Linux 8.5', server_address: '10.0.1.2', kickstart: 'oel85-stig.ks' }
+    dhcp_config: {
+      broadcast: '10.0.1.255',
+      domain: 'home.lab',
+      gateway: '10.0.1.1',
+      range_start: '10.0.1.20',
+      range_end: '10.0.1.200',
+      server_address: '10.0.1.2',
+      subnet: '10.0.1.0',
+      subnet_mask: '255.255.255.0'
+    }
+    vsftpd_config:
+    - { search_string: 'anonymous_enable=NO', line: 'anonymous_enable=YES' }
+    - { search_string: 'write_enable=YES', line: 'write_enable=NO' }
 
   tasks:  
   - name: Update all installed packages
@@ -14,29 +26,116 @@
   - name: Install DHCP, TFTP, FTP, and SysLinux
     yum:
       name:
-        - dhcp-server
-        - tftp-server
-        - vsftpd
-        - syslinux
+      - dhcp-server
+      - tftp-server
+      - vsftpd
+      - syslinux
       state: present
 
+  - name: Configure DHCP
+    blockinfile:
+      path: /etc/dhcp/dhcpd.conf
+      block: |
+        #DHCP configuration for PXE boot server
+        ddns-update-style interim;
+        ignore client-updates;
+        authoritative;
+        allow booting;
+        allow bootp;
+        allow unknown-clients;
+        subnet {{ dhcp_config.subnet }}
+        netmask {{ dhcp_config.subnet_mask }}
+        {
+        range {{ dhcp_config.range_start }} {{ dhcp_config.range_end }};
+        option domain-name-servers {{ dhcp_config.server_address }};
+        option domain-name {{ dhcp_config.domain }};
+        option routers {{ dhcp_config.gateway }};
+        option broadcast-address {{ dhcp_config.broadcast }};
+        default-lease-time 600;
+        max-lease-time 7200;
+        #PXE boot server
+        next-server {{ dhcp_config.server_address }};
+        filename "pxelinux.0";
+        }
+
+  - name: Configure FTP
+    lineinfile:
+      path: /etc/vsftpd/vsftpd.conf
+      search_string: "{{ item.search_string }}"
+      line: "{{ item.line }}"
+    with_items: "{{ vsftpd_config }}"
+
+  - name: Configure Firewall
+    ansible.posix.firewalld:
+      service: "{{ item }}"
+      permanent: yes
+      state: enabled
+      zone: public
+      immediate: yes
+    with_items:
+    - dhcp
+    - proxy-dhcp
+    - ftp
+    - tftp
+
   - name: Start DHCP, TFTP, and FTP services
-    ansible.builtin.systemd:
+    systemd:
       name:
-        - dhcpd
-        - tftp
-        - vsftpd
+      - dhcpd
+      - tftp
+      - vsftpd
       enabled: yes
       state: started
 
   - name: Create temp directory for images
-    ansible.builtin.tempfile:
+    tempfile:
       state: directory
       suffix: images
     register: temp_image_dir
 
-  - name: Copy images
-    ansible.builtin.copy:
-      src: "{{ images_path }}/{{ item }}"
-      dest: "{{ temp_image_dir.path }}"
+  - name: Copy TFTP files
+    copy:
+      src: "{{ item }}"
+      dest: /var/lib/tftpboot/
+    with_items:
+    - /usr/share/syslinux/pxelinux.0
+    - /usr/share/syslinux/menu.c32
+    - /usr/share/syslinux/mboot.c32
+    - /usr/share/syslinux/chain.c32
+    - /usr/share/syslinux/ldlinux.c32
+    - /usr/share/syslinux/libutil.c32
+    - /usr/share/syslinux/libcom32.c32
+
+  - name: Create TFTP PXE config directory
+    file:
+      path: '/var/lib/tftpboot/pxelinux.cfg'
+      state: directory
+
+  - name: Create FTP KickStart directory
+    file:
+      path: '/var/ftp/pub/ks'
+      state: directory
+
+  - include_tasks: ../includes/pxe-image-configuration.yml
     with_items: "{{ images }}"
+
+  - name: Set file permissions
+    file:
+      path: "{{ item }}"
+      state: directory
+      recursive: yes
+      mode: '0777'
+    with_items:
+    - /var/lib/tftpboot
+    - /var/ftp
+
+  - name: Set file context
+    sefcontext:
+      target: '{{ item.target }}(/.*)?'
+      setype: "{{ item.setype }}"
+      reload: True
+      state: present
+    register: filecontext
+    with_items:
+    - { target: '/var/lib/tftpboot', setype: 'tftpdir_rw_t' }
+    - { target: '/var/ftp', setype: 'public_content_t' }
