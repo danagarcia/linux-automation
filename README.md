@@ -7,12 +7,12 @@ Playbook to install and configure a PXE boot server for your local environment.
 1. Ansible
     - [Installation Guide](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html)
 2. Two machines/virtual machines:
-    Machine Minimum Specs:
-        PXE Server:
+    - Machine Minimum Specs:
+        - PXE Server:
             - 2 vCPUs
             - 2 GB RAM
             - 60 GB Disk
-                Partitions:
+                - Partitions:
                     | Name | Size (GB) |
                     | ---- | ---- |
                     | / | 9 |
@@ -24,11 +24,11 @@ Playbook to install and configure a PXE boot server for your local environment.
                     | /var/log | 4 |
                     | /var/log/audit | 4 |
                     | /var/tmp | 4 |
-        Test Server:
+        - Test Server:
             - 2 vCPUS
             - 2 GB RAM
             - 40 GB Disk
-                Partitions:
+                - Partitions:
                     | Name | Size (GB) |
                     | ---- | ---- |
                     | / | 10 |
