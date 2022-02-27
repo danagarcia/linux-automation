@@ -1,8 +1,8 @@
 - hosts: all
   vars:
     images:
-    # - { local_path: '~/Images/', file: 'oel79', menu_name: 'Oracle Linux 7.9', server_address: '10.0.1.2', kickstart: 'oel79-stig.ks' }
-    - { local_path: '/Users/danagarcia/Documents/Images', file: 'oel85', menu_name: 'Oracle Linux 8.5', server_address: '10.0.1.2', kickstart: 'oel85-stig.cfg' }
+    - { local_path: '~/Images', file: 'oel79', menu_name: 'Oracle Linux 7.9', server_address: '10.0.1.2', kickstart: 'oel79-stig.cfg' }
+    - { local_path: '~/Images', file: 'oel85', menu_name: 'Oracle Linux 8.5', server_address: '10.0.1.2', kickstart: 'oel85-stig.cfg' }
     dhcp_config: {
       broadcast: '10.0.1.255',
       domain: 'home.lab',
