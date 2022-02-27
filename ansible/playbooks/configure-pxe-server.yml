@@ -1,8 +1,8 @@
 - hosts: all
   vars:
     images:
-    - { local_path: '~/Images/', file: 'oel79', menu_name: 'Oracle Linux 7.9', server_address: '10.0.1.2', kickstart: 'oel79-stig.ks' }
-    - { local_path: '~/Images/', file: 'oel85', menu_name: 'Oracle Linux 8.5', server_address: '10.0.1.2', kickstart: 'oel85-stig.ks' }
+    # - { local_path: '~/Images/', file: 'oel79', menu_name: 'Oracle Linux 7.9', server_address: '10.0.1.2', kickstart: 'oel79-stig.ks' }
+    - { local_path: '/Users/danagarcia/Documents/Images', file: 'oel85', menu_name: 'Oracle Linux 8.5', server_address: '10.0.1.2', kickstart: 'oel85-stig.cfg' }
     dhcp_config: {
       broadcast: '10.0.1.255',
       domain: 'home.lab',
@@ -25,11 +25,11 @@
 
   - name: Install DHCP, TFTP, FTP, and SysLinux
     yum:
-      name:
-      - dhcp-server
-      - tftp-server
-      - vsftpd
-      - syslinux
+      name: 
+        - dhcp-server
+        - tftp-server
+        - vsftpd
+        - syslinux
       state: present
 
   - name: Configure DHCP
@@ -48,7 +48,7 @@
         {
         range {{ dhcp_config.range_start }} {{ dhcp_config.range_end }};
         option domain-name-servers {{ dhcp_config.server_address }};
-        option domain-name {{ dhcp_config.domain }};
+        option domain-name "{{ dhcp_config.domain }}";
         option routers {{ dhcp_config.gateway }};
         option broadcast-address {{ dhcp_config.broadcast }};
         default-lease-time 600;
@@ -80,23 +80,24 @@
 
   - name: Start DHCP, TFTP, and FTP services
     systemd:
-      name:
-      - dhcpd
-      - tftp
-      - vsftpd
+      name: "{{ item }}"
       enabled: yes
       state: started
+    with_items:
+    - dhcpd
+    - tftp
+    - vsftpd
 
-  - name: Create temp directory for images
-    tempfile:
+  - name: Create iso directory
+    file:
+      path: /var/isos
       state: directory
-      suffix: images
-    register: temp_image_dir
 
   - name: Copy TFTP files
     copy:
       src: "{{ item }}"
       dest: /var/lib/tftpboot/
+      remote_src: yes
     with_items:
     - /usr/share/syslinux/pxelinux.0
     - /usr/share/syslinux/menu.c32
@@ -111,6 +112,11 @@
       path: '/var/lib/tftpboot/pxelinux.cfg'
       state: directory
 
+  - name: Create default TFTP PXE boot menu
+    file:
+      path: '/var/lib/tftpboot/pxelinux.cfg/default'
+      state: touch
+
   - name: Create FTP KickStart directory
     file:
       path: '/var/ftp/pub/ks'
@@ -123,7 +129,7 @@
     file:
       path: "{{ item }}"
       state: directory
-      recursive: yes
+      recurse: yes
       mode: '0777'
     with_items:
     - /var/lib/tftpboot

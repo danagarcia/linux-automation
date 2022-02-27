@@ -1,13 +1,14 @@
 - name: Copy images
   copy:
     src: "{{ item.local_path }}/{{ item.file }}.iso"
-    dest: "{{ temp_image_dir.path }}"
-    remote_src: yes
+    dest: "/var/isos/{{ item.file }}.iso"
+    remote_src: no
 
 - name: Copy Kickstarts
   copy:
     src: "{{ item.local_path }}/{{ item.kickstart }}"
-    dest: "/var/ftp/pub/ks/"
+    dest: "/var/ftp/pub/ks/{{ item.kickstart }}"
+    remote_src: no
 
 - name: Create image network boot directories
   file:
@@ -26,27 +27,29 @@
 
 - name: Mount images
   ansible.posix.mount:
-    path: "/iso_image/{{ item.file }}"
-    src: "{{ temp_image_dir.path }}/{{ item.file }}.iso"
+    path: /iso_image/{{ item.file }}
+    src: /var/isos/{{ item.file }}.iso
     fstype: iso9660
-    ops: ro, noauto
-    state: present
+    opts: ro,noauto
+    state: mounted
 
 - name: Copy images to FTP
   copy:
     src: "/iso_image/{{ item.file }}/"
     dest: "/var/ftp/pub/{{ item.file }}/"
-    directory_mode: yes
+    remote_src: yes
 
 - name: Copy image PXE kernel modules to TFTP
   copy:
     src: "/var/ftp/pub/{{ item.file }}/images/pxeboot/initrd.img"
     dest: "/var/lib/tftpboot/networkboot/{{ item.file }}/"
+    remote_src: yes
 
 - name: Copy image PXE kernel to TFTP
   copy:
     src: "/var/ftp/pub/{{ item.file }}/images/pxeboot/vmlinuz"
     dest: "/var/lib/tftpboot/networkboot/{{ item.file }}/"
+    remote_src: yes
 
 - name: Configure PXE Boot Menu
   blockinfile:
@@ -72,3 +75,8 @@
   ansible.posix.mount:
     path: "/iso_image/{{ item.file }}"
     state: unmounted
+
+- name: Remove iso directory
+  file:
+    path: "/var/isos/"
+    state: absent
