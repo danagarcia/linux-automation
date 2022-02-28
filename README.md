@@ -65,8 +65,8 @@ Playbook to install and configure a PXE boot server for your local environment.
     vi ansible/playbooks/configure-pxe-server.yml
     ```
     - Update values to match your configuration for variables:
-        - home -> vars -> images
-        - home -> vars -> dhcp_config
+        - host -> vars -> images
+        - host -> vars -> dhcp_config
 4. Generate SSH Key
     ```bash
     ssh-keygen -b 4096
