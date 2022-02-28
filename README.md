@@ -20,7 +20,7 @@ Playbook to install and configure a PXE boot server for your local environment.
                     | /boot/efi | 1 |
                     | /home | 4 |
                     | /tmp | 4 |
-                    | /var | 18 |
+                    | /var | 28 |
                     | /var/log | 4 |
                     | /var/log/audit | 4 |
                     | /var/tmp | 4 |
